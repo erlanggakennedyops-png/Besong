@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   build:
+    name: Build BESOUND Golden Dusk
     runs-on: ubuntu-latest
 
     env:
@@ -28,12 +29,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK manually
+      - name: Install Android SDK
         run: |
           echo "Checking Android SDK..."
 
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
-            -type f -name sdkmanager | sort -V | tail -n 1)
+            -type f -name sdkmanager -print -quit)
 
           if [ -z "$SDKMANAGER" ]; then
             echo "ERROR: sdkmanager not found"
@@ -41,8 +42,6 @@ jobs:
           fi
 
           echo "Using $SDKMANAGER"
-
-          chmod +x "$SDKMANAGER"
 
           yes | "$SDKMANAGER" \
             --sdk_root="$ANDROID_HOME" --licenses || true
@@ -55,8 +54,10 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
-      - name: Extract BESOUND project
+      - name: Extract BESOUND source
         run: |
           mkdir -p extracted
 
@@ -75,38 +76,53 @@ jobs:
             exit 1
           fi
 
-          echo "Extracting $ZIP_FILE"
+          echo "Extracting: $ZIP_FILE"
           unzip -oq "$ZIP_FILE" -d extracted
 
-          PROJECT_FILE=$(find extracted \
-            -name settings.gradle.kts -print -quit)
+          SETTINGS=$(find extracted -type f \
+            \( -name settings.gradle.kts \
+            -o -name settings.gradle \) \
+            -print -quit)
 
-          if [ -z "$PROJECT_FILE" ]; then
-            echo "ERROR: Android project not found"
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: Gradle project not found"
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$PROJECT_FILE")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          PROJECT_DIR=$(dirname "$SETTINGS")
 
-          echo "Project: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "Found project: $PROJECT_DIR"
+          ls -la "$PROJECT_DIR"
 
       - name: Build BESOUND APK
         run: |
           cd "$PROJECT_DIR"
 
-          if [ ! -f gradlew ]; then
-            echo "ERROR: Gradle wrapper not found"
+          if [ -f gradlew ]; then
+            bash gradlew assembleDebug --no-daemon
+          else
+            gradle assembleDebug --no-daemon
+          fi
+
+      - name: Locate APK
+        run: |
+          APK=$(find "$PROJECT_DIR" \
+            -type f -name "app-debug.apk" -print -quit)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK was not generated"
             exit 1
           fi
 
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          echo "APK found: $APK"
+          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
           name: BESOUND-v0.4-Golden-Dusk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 7
