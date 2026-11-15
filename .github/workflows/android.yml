@@ -1,5 +1,5 @@
 
-name: Build BE.I MUSIC APK
+name: Build BESOUND APK
 
 on:
   workflow_dispatch:
@@ -12,12 +12,8 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build BESOUND Android APK
     runs-on: ubuntu-latest
-
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout source
@@ -30,65 +26,37 @@ jobs:
           java-version: '17'
 
       - name: Locate Android SDK
-        run: |
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
-          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
 
       - name: Accept Android licenses
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses || true
+        run: yes | sdkmanager --licenses
 
       - name: Install Android SDK packages
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Extract project
+      - name: Extract BESOUND project
         run: |
           mkdir extracted
-          unzip -q BEI_MUSIC_Android_Starter.zip -d extracted
+          unzip -q BESOUND_Android_Starter_Final_Logo-1.zip -d extracted
+          ls -la extracted
 
-      - name: Fix Java and Kotlin compatibility
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p = Path("extracted/BEI_MUSIC/app/build.gradle.kts")
-          s = p.read_text()
-
-          marker = "    targetSdk = 35"
-          addition = """    targetSdk = 35
-
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
-              }
-
-              kotlinOptions {
-                  jvmTarget = "17"
-              }"""
-
-          if marker not in s:
-              raise SystemExit("Could not find targetSdk marker")
-
-          s = s.replace(marker, addition, 1)
-          p.write_text(s)
-          print("Java and Kotlin targets set to 17")
-          PY
-
-      - name: Build APK
+      - name: Build BESOUND APK
         working-directory: extracted/BEI_MUSIC
         run: gradle assembleDebug
 
-      - name: Upload APK
+      - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BEI-MUSIC-APK
+          name: BESOUND-APK
           path: extracted/BEI_MUSIC/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
