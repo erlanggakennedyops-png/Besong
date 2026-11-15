@@ -1,5 +1,5 @@
 
-name: Build BESOUND APK
+name: Build BESOUND Android APK
 
 on:
   workflow_dispatch:
@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -27,9 +26,16 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "platform-tools"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -38,18 +44,48 @@ jobs:
 
       - name: Extract BESOUND project
         run: |
-          mkdir extracted
-          unzip -q BESOUND_Android_Starter_Final_Logo-1.zip -d extracted
-          ls -la extracted
+          mkdir -p extracted
+
+          ZIP_FILE=$(find . -maxdepth 1 \
+            -type f -iname "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: ZIP source tidak ditemukan"
+            exit 1
+          fi
+
+          echo "Menggunakan: $ZIP_FILE"
+          unzip -oq "$ZIP_FILE" -d extracted
+
+          PROJECT_DIR="extracted"
+
+          if [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
+            PROJECT_FILE=$(find extracted \
+              -name settings.gradle.kts | head -n 1)
+
+            if [ -z "$PROJECT_FILE" ]; then
+              echo "ERROR: Gradle project tidak ditemukan"
+              exit 1
+            fi
+
+            PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Project ditemukan: $PROJECT_DIR"
 
       - name: Build BESOUND APK
-        working-directory: extracted/BEI_MUSIC
-        run: gradle assembleDebug
+        id: build
+        run: |
+          gradle -p "$PROJECT_DIR" \
+            --no-daemon assembleDebug
+
+          echo "APK_PATH=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_OUTPUT
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-APK
-          path: extracted/BEI_MUSIC/app/build/outputs/apk/debug/app-debug.apk
+          name: BESOUND-v0.4-Golden-Dusk
+          path: ${{ steps.build.outputs.APK_PATH }}
           if-no-files-found: error
           retention-days: 7
