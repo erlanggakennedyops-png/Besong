@@ -14,6 +14,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -24,68 +28,85 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install Android SDK
+      - name: Install Android SDK manually
         run: |
-          sdkmanager \
+          echo "Checking Android SDK..."
+
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
+            -type f -name sdkmanager | sort -V | tail -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
+            exit 1
+          fi
+
+          echo "Using $SDKMANAGER"
+
+          chmod +x "$SDKMANAGER"
+
+          yes | "$SDKMANAGER" \
+            --sdk_root="$ANDROID_HOME" --licenses || true
+
+          "$SDKMANAGER" \
+            --sdk_root="$ANDROID_HOME" \
             "platforms;android-35" \
             "build-tools;35.0.0" \
             "platform-tools"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
 
       - name: Extract BESOUND project
         run: |
           mkdir -p extracted
 
           ZIP_FILE=$(find . -maxdepth 1 \
-            -type f -iname "*.zip" | head -n 1)
+            -type f \
+            -iname "BESOUND_v0.4_Golden_Dusk_Upload.zip" \
+            -print -quit)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: ZIP source tidak ditemukan"
+            ZIP_FILE=$(find . -maxdepth 1 \
+              -type f -iname "*.zip" -print -quit)
+          fi
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: Source ZIP not found"
             exit 1
           fi
 
-          echo "Menggunakan: $ZIP_FILE"
+          echo "Extracting $ZIP_FILE"
           unzip -oq "$ZIP_FILE" -d extracted
 
-          PROJECT_DIR="extracted"
+          PROJECT_FILE=$(find extracted \
+            -name settings.gradle.kts -print -quit)
 
-          if [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
-            PROJECT_FILE=$(find extracted \
-              -name settings.gradle.kts | head -n 1)
-
-            if [ -z "$PROJECT_FILE" ]; then
-              echo "ERROR: Gradle project tidak ditemukan"
-              exit 1
-            fi
-
-            PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "ERROR: Android project not found"
+            exit 1
           fi
 
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-          echo "Project ditemukan: $PROJECT_DIR"
+
+          echo "Project: $PROJECT_DIR"
 
       - name: Build BESOUND APK
-        id: build
         run: |
-          gradle -p "$PROJECT_DIR" \
-            --no-daemon assembleDebug
+          cd "$PROJECT_DIR"
 
-          echo "APK_PATH=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_OUTPUT
+          if [ ! -f gradlew ]; then
+            echo "ERROR: Gradle wrapper not found"
+            exit 1
+          fi
+
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
           name: BESOUND-v0.4-Golden-Dusk
-          path: ${{ steps.build.outputs.APK_PATH }}
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
