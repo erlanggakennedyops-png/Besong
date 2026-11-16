@@ -1,3 +1,4 @@
+
 name: Build BESOUND Android APK
 
 on:
@@ -16,52 +17,135 @@ jobs:
   build:
     name: Build BESOUND Golden Dusk
     runs-on: ubuntu-latest
+
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
+      # 1. Download repository
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # 2. Setup Java
+      - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # 3. Setup Android SDK without deprecated setup-android action
+      - name: Setup Android SDK
+        run: |
+          echo "Android SDK: $ANDROID_HOME"
 
-      - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          test -d "$ANDROID_HOME" || {
+            echo "ERROR: Android SDK directory not found"
+            exit 1
+          }
 
-      - name: Set up Gradle
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
+            -type f -name sdkmanager | head -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
+            exit 1
+          fi
+
+          echo "Using: $SDKMANAGER"
+
+          yes | "$SDKMANAGER" \
+            --sdk_root="$ANDROID_HOME" --licenses || true
+
+          "$SDKMANAGER" \
+            --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      # 4. Setup Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Extract canonical BESOUND source
+      # 5. Extract BESOUND source
+      - name: Extract BESOUND source
         run: |
           ZIP_FILE="$GITHUB_WORKSPACE/BESOUND_v0.8.0_CANONICAL_SOURCE_FIX.zip"
-          test -f "$ZIP_FILE" || { echo "Source ZIP not found: $ZIP_FILE"; exit 1; }
-          mkdir -p "$RUNNER_TEMP/besound-source"
-          unzip -q "$ZIP_FILE" -d "$RUNNER_TEMP/besound-source"
-          test -f "$RUNNER_TEMP/besound-source/settings.gradle.kts"
-          test -f "$RUNNER_TEMP/besound-source/app/build.gradle.kts"
-          test -f "$RUNNER_TEMP/besound-source/app/src/main/java/com/bei/music/MainActivity.kt"
-          echo "PROJECT_DIR=$RUNNER_TEMP/besound-source" >> "$GITHUB_ENV"
-          echo "Canonical source extracted and verified."
+          SOURCE_DIR="$RUNNER_TEMP/besound-source"
 
-      - name: Verify gesture source
-        run: |
-          if grep -n 'import androidx.compose.ui.input.pointer.awaitPointerEvent' "$PROJECT_DIR/app/src/main/java/com/bei/music/MainActivity.kt"; then
-            echo "Invalid awaitPointerEvent import remains"
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: BESOUND source ZIP not found"
             exit 1
           fi
-          grep -n 'awaitPointerEvent' "$PROJECT_DIR/app/src/main/java/com/bei/music/MainActivity.kt" || true
 
-      - name: Build debug APK
-        working-directory: ${{ runner.temp }}/besound-source
-        run: gradle --no-daemon assembleDebug
+          mkdir -p "$SOURCE_DIR"
 
-      - name: Upload APK
+          unzip -q "$ZIP_FILE" -d "$SOURCE_DIR"
+
+          if [ ! -f "$SOURCE_DIR/settings.gradle.kts" ] && \
+             [ ! -f "$SOURCE_DIR/settings.gradle" ]; then
+            echo "ERROR: Gradle settings file not found"
+            find "$SOURCE_DIR" -maxdepth 3 -type f
+            exit 1
+          fi
+
+          if [ ! -f "$SOURCE_DIR/app/build.gradle.kts" ] && \
+             [ ! -f "$SOURCE_DIR/app/build.gradle" ]; then
+            echo "ERROR: Android app Gradle file not found"
+            exit 1
+          fi
+
+          if [ ! -f "$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt" ]; then
+            echo "ERROR: MainActivity.kt not found"
+            exit 1
+          fi
+
+          echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
+
+          echo "BESOUND source extracted successfully"
+
+      # 6. Verify source
+      - name: Verify BESOUND source
+        run: |
+          echo "Checking project structure..."
+
+          ls -la "$SOURCE_DIR"
+          echo "Checking MainActivity..."
+
+          grep -n "awaitPointerEvent" \
+            "$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt" || true
+
+          echo "Source verification completed"
+
+      # 7. Build APK
+      - name: Build BESOUND APK
+        run: |
+          cd "$SOURCE_DIR"
+
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew --no-daemon assembleDebug
+          else
+            gradle --no-daemon assembleDebug
+          fi
+
+      # 8. Verify APK
+      - name: Verify APK
+        run: |
+          APK="$SOURCE_DIR/app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: APK was not generated"
+            exit 1
+          fi
+
+          ls -lh "$APK"
+          echo "APK successfully generated"
+
+      # 9. Upload APK
+      - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
           name: BESOUND-v0.8.0-APK
