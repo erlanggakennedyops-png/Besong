@@ -1,13 +1,11 @@
-
 name: Build BESOUND Android APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - 'BESOUND_v0.8.2_LYRICS_SCROLL_FIX.zip'
+      - 'BESOUND_v0.8.3_UNIFIED_SWIPE_UPDATE.zip'
       - '.github/workflows/android.yml'
 
 permissions:
@@ -17,11 +15,9 @@ jobs:
   build:
     name: Build BESOUND Golden Dusk
     runs-on: ubuntu-latest
-
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -32,64 +28,48 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK packages
         run: |
-          test -d "$ANDROID_HOME"
-
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
-            -type f -name sdkmanager | head -n 1)
-
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)
           if [ -z "$SDKMANAGER" ]; then
             echo "ERROR: sdkmanager not found"
             exit 1
           fi
-
-          yes | "$SDKMANAGER" \
-            --sdk_root="$ANDROID_HOME" --licenses || true
-
-          "$SDKMANAGER" \
-            --sdk_root="$ANDROID_HOME" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Extract BESOUND v0.8.2 source
+      - name: Extract BESOUND v0.8.3 source
         run: |
-          ZIP_FILE="$GITHUB_WORKSPACE/BESOUND_v0.8.2_LYRICS_SCROLL_FIX.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/BESOUND_v0.8.3_UNIFIED_SWIPE_UPDATE.zip"
           SOURCE_DIR="$RUNNER_TEMP/besound-source"
-
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: BESOUND v0.8.2 ZIP not found"
+            echo "ERROR: BESOUND v0.8.3 ZIP not found"
             ls -lah "$GITHUB_WORKSPACE"
             exit 1
           fi
-
           mkdir -p "$SOURCE_DIR"
           unzip -q "$ZIP_FILE" -d "$SOURCE_DIR"
-
           test -f "$SOURCE_DIR/settings.gradle.kts"
           test -f "$SOURCE_DIR/app/build.gradle.kts"
           test -f "$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt"
-
           echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
 
       - name: Verify BESOUND source
         run: |
-          grep -q 'versionName = "0.8.2"' \
-            "$SOURCE_DIR/app/build.gradle.kts"
-
-          grep -q 'if (totalY > 0f) onSwipeDown() else onSwipeUp()' \
-            "$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt"
-
-          grep -q 'verticalSwipeGesture(onSwipeDown = {}, onSwipeUp = onClose)' \
-            "$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt"
-
-          echo "BESOUND v0.8.2 source verified"
+          MAIN="$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt"
+          grep -q 'versionName = "0.8.3"' "$SOURCE_DIR/app/build.gradle.kts"
+          grep -q 'versionCode = 17' "$SOURCE_DIR/app/build.gradle.kts"
+          grep -q 'SWIPE UP FOR LYRICS' "$MAIN"
+          grep -q 'verticalSwipeGesture(onSwipeDown = {}, onSwipeUp = onLyrics)' "$MAIN"
+          grep -q 'verticalSwipeGesture(onSwipeDown = {}, onSwipeUp = onClose)' "$MAIN"
+          grep -q 'verticalScroll(rememberScrollState())' "$MAIN"
+          echo "BESOUND v0.8.3 source checks passed"
 
       - name: Build BESOUND APK
         run: |
@@ -105,7 +85,7 @@ jobs:
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v0.8.2-APK
+          name: BESOUND-v0.8.3-APK
           path: ${{ runner.temp }}/besound-source/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
