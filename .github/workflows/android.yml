@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'BESOUND_v0.8.1_GESTURE_HINTS.zip'
+      - 'BESOUND_v0.8.2_LYRICS_SCROLL_FIX.zip'
       - '.github/workflows/android.yml'
 
 permissions:
@@ -23,26 +23,18 @@ jobs:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      # 1. Checkout repository
       - name: Checkout source
         uses: actions/checkout@v4
 
-      # 2. Setup Java 17
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # 3. Setup Android SDK
       - name: Setup Android SDK
         run: |
-          echo "Checking Android SDK..."
-
-          test -d "$ANDROID_HOME" || {
-            echo "ERROR: Android SDK not found"
-            exit 1
-          }
+          test -d "$ANDROID_HOME"
 
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
             -type f -name sdkmanager | head -n 1)
@@ -61,21 +53,18 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      # 4. Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      # 5. Extract BESOUND v0.8.1
-      - name: Extract BESOUND source
+      - name: Extract BESOUND v0.8.2 source
         run: |
-          ZIP_FILE="$GITHUB_WORKSPACE/BESOUND_v0.8.1_GESTURE_HINTS.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/BESOUND_v0.8.2_LYRICS_SCROLL_FIX.zip"
           SOURCE_DIR="$RUNNER_TEMP/besound-source"
 
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: BESOUND v0.8.1 ZIP not found"
-            echo "Files in repository:"
+            echo "ERROR: BESOUND v0.8.2 ZIP not found"
             ls -lah "$GITHUB_WORKSPACE"
             exit 1
           fi
@@ -83,54 +72,40 @@ jobs:
           mkdir -p "$SOURCE_DIR"
           unzip -q "$ZIP_FILE" -d "$SOURCE_DIR"
 
-          if [ ! -f "$SOURCE_DIR/settings.gradle.kts" ]; then
-            echo "ERROR: settings.gradle.kts not found"
-            find "$SOURCE_DIR" -maxdepth 3 -type f
-            exit 1
-          fi
-
-          echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
-
-          echo "BESOUND source extracted successfully"
-
-      # 6. Verify project
-      - name: Verify BESOUND source
-        run: |
+          test -f "$SOURCE_DIR/settings.gradle.kts"
           test -f "$SOURCE_DIR/app/build.gradle.kts"
           test -f "$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt"
 
-          grep -q 'versionName = "0.8.1"' \
+          echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
+
+      - name: Verify BESOUND source
+        run: |
+          grep -q 'versionName = "0.8.2"' \
             "$SOURCE_DIR/app/build.gradle.kts"
 
-          grep -q 'SWIPE DOWN FOR LYRICS' \
+          grep -q 'if (totalY > 0f) onSwipeDown() else onSwipeUp()' \
             "$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt"
 
-          echo "BESOUND v0.8.1 source verified"
+          grep -q 'verticalSwipeGesture(onSwipeDown = {}, onSwipeUp = onClose)' \
+            "$SOURCE_DIR/app/src/main/java/com/bei/music/MainActivity.kt"
 
-      # 7. Build APK
+          echo "BESOUND v0.8.2 source verified"
+
       - name: Build BESOUND APK
         run: |
           cd "$SOURCE_DIR"
           gradle --no-daemon assembleDebug
 
-      # 8. Verify APK
       - name: Verify APK
         run: |
           APK="$SOURCE_DIR/app/build/outputs/apk/debug/app-debug.apk"
-
-          if [ ! -f "$APK" ]; then
-            echo "ERROR: APK was not generated"
-            exit 1
-          fi
-
+          test -f "$APK"
           ls -lh "$APK"
-          echo "APK successfully generated"
 
-      # 9. Upload APK
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v0.8.1-APK
+          name: BESOUND-v0.8.2-APK
           path: ${{ runner.temp }}/besound-source/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
