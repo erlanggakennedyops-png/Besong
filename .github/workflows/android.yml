@@ -1,3 +1,4 @@
+
 name: Build BESOUND Golden Dusk v1.0.0 APK
 
 on:
@@ -31,11 +32,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          : "${ANDROID_HOME:?ANDROID_HOME is not set on the GitHub runner}"
+          : "${ANDROID_HOME:?ANDROID_HOME is not set}"
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
           if [ -z "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager was not found under $ANDROID_HOME/cmdline-tools"
-            find "$ANDROID_HOME" -maxdepth 4 -type f -name sdkmanager || true
+            echo "ERROR: sdkmanager not found"
             exit 1
           fi
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
@@ -78,17 +78,35 @@ jobs:
           BESOUND_KEY_PASSWORD: ${{ secrets.BESOUND_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$BESOUND_KEYSTORE_BASE64" || { echo "Missing BESOUND_KEYSTORE_BASE64"; exit 1; }
-          test -n "$BESOUND_KEY_ALIAS" || { echo "Missing BESOUND_KEY_ALIAS"; exit 1; }
-          test -n "$BESOUND_STORE_PASSWORD" || { echo "Missing BESOUND_STORE_PASSWORD"; exit 1; }
-          test -n "$BESOUND_KEY_PASSWORD" || { echo "Missing BESOUND_KEY_PASSWORD"; exit 1; }
+          test -n "$BESOUND_KEYSTORE_BASE64" || { echo "ERROR: Missing BESOUND_KEYSTORE_BASE64"; exit 1; }
+          test -n "$BESOUND_KEY_ALIAS" || { echo "ERROR: Missing BESOUND_KEY_ALIAS"; exit 1; }
+          test -n "$BESOUND_STORE_PASSWORD" || { echo "ERROR: Missing BESOUND_STORE_PASSWORD"; exit 1; }
+          test -n "$BESOUND_KEY_PASSWORD" || { echo "ERROR: Missing BESOUND_KEY_PASSWORD"; exit 1; }
 
           KEYSTORE_PATH="$RUNNER_TEMP/besound-upload.jks"
-          printf '%s' "$BESOUND_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          printf '%s' "$BESOUND_KEYSTORE_BASE64" | tr -d '[:space:]' > "$RUNNER_TEMP/keystore.b64"
+          B64_LENGTH="$(wc -c < "$RUNNER_TEMP/keystore.b64" | tr -d ' ')"
+          echo "Base64 character count: $B64_LENGTH"
+
+          if [ "$((B64_LENGTH % 4))" -ne 0 ]; then
+            echo "ERROR: Base64 length is not divisible by 4."
+            exit 1
+          fi
+
+          if ! base64 --decode "$RUNNER_TEMP/keystore.b64" > "$KEYSTORE_PATH"; then
+            echo "ERROR: BESOUND_KEYSTORE_BASE64 is not valid Base64."
+            exit 1
+          fi
+
           test -s "$KEYSTORE_PATH"
-          keytool -list -keystore "$KEYSTORE_PATH" \
+          echo "Decoded keystore size: $(wc -c < "$KEYSTORE_PATH") bytes"
+
+          if ! keytool -list -keystore "$KEYSTORE_PATH" \
             -storepass "$BESOUND_STORE_PASSWORD" \
-            -alias "$BESOUND_KEY_ALIAS" >/dev/null
+            -alias "$BESOUND_KEY_ALIAS"; then
+            echo "ERROR: Check store password and key alias."
+            exit 1
+          fi
 
           {
             echo "BESOUND_KEYSTORE_PATH=$KEYSTORE_PATH"
@@ -96,7 +114,8 @@ jobs:
             echo "BESOUND_STORE_PASSWORD=$BESOUND_STORE_PASSWORD"
             echo "BESOUND_KEY_PASSWORD=$BESOUND_KEY_PASSWORD"
           } >> "$GITHUB_ENV"
-          echo "Signing keystore is readable and alias exists."
+
+          echo "Signing keystore decoded and alias verified."
 
       - name: Build signed release APK
         shell: bash
@@ -105,7 +124,7 @@ jobs:
           cd "$SOURCE_DIR"
           gradle --no-daemon --stacktrace :app:assembleRelease
 
-      - name: Verify APK signature
+      - name: Verify APK signature and package
         shell: bash
         run: |
           set -euo pipefail
