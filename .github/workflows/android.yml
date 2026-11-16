@@ -1,20 +1,21 @@
-name: Build BESOUND Golden Dusk v1.0.1 APK
+
+name: Build BESOUND v1.0.2 APK
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - 'BESOUND_v1.0.1_SOURCE.zip'
-      - '.github/workflows/android.yml'
+    branches:
+      - main
+      - master
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build BESOUND v1.0.1
+    name: Build BESOUND v1.0.2
     runs-on: ubuntu-latest
+
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
@@ -32,14 +33,24 @@ jobs:
       - name: Install Android SDK packages
         shell: bash
         run: |
-          set -euo pipefail
-          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
-          test -n "$SDKMANAGER"
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
-            "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          set -e
 
-      - name: Set up Gradle
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" \
+            -type f -name sdkmanager 2>/dev/null | sort | tail -n 1)"
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: Android sdkmanager not found"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -48,21 +59,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$GITHUB_WORKSPACE/BESOUND_v1.0.1_SOURCE.zip"
+
+          ZIP_FILE="$GITHUB_WORKSPACE/BESOUND_v1.0.2_SOURCE.zip"
           SOURCE_DIR="$RUNNER_TEMP/besound-source"
-          test -f "$ZIP_FILE"
+
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: BESOUND_v1.0.2_SOURCE.zip not found"
+            exit 1
+          fi
+
           mkdir -p "$SOURCE_DIR"
           unzip -q "$ZIP_FILE" -d "$SOURCE_DIR"
+
           test -f "$SOURCE_DIR/settings.gradle.kts"
+          test -f "$SOURCE_DIR/build.gradle.kts"
           test -f "$SOURCE_DIR/app/build.gradle.kts"
           test -f "$SOURCE_DIR/app/src/main/AndroidManifest.xml"
           test -f "$SOURCE_DIR/app/src/main/java/com/bei/besound/MainActivity.kt"
-          grep -q 'applicationId = "com.bei.besound"' "$SOURCE_DIR/app/build.gradle.kts"
-          grep -q 'versionCode = 2' "$SOURCE_DIR/app/build.gradle.kts"
-          grep -q 'versionName = "1.0.1"' "$SOURCE_DIR/app/build.gradle.kts"
-          grep -q 'PlayerNotificationManager' "$SOURCE_DIR/app/src/main/java/com/bei/besound/MainActivity.kt"
+
+          grep -Fq 'applicationId = "com.bei.besound"' \
+            "$SOURCE_DIR/app/build.gradle.kts"
+
+          grep -Fq 'versionCode = 3' \
+            "$SOURCE_DIR/app/build.gradle.kts"
+
+          grep -Fq 'versionName = "1.0.2"' \
+            "$SOURCE_DIR/app/build.gradle.kts"
+
+          grep -Fq 'PlayerNotificationManager' \
+            "$SOURCE_DIR/app/src/main/java/com/bei/besound/MainActivity.kt"
+
+          echo "BESOUND source v1.0.2 verified."
+
           echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
-          echo "BESOUND source verified."
 
       - name: Prepare and verify signing keystore
         shell: bash
@@ -73,44 +102,79 @@ jobs:
           BESOUND_KEY_PASSWORD: ${{ secrets.BESOUND_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$BESOUND_KEYSTORE_BASE64"
-          test -n "$BESOUND_KEY_ALIAS"
-          test -n "$BESOUND_STORE_PASSWORD"
-          test -n "$BESOUND_KEY_PASSWORD"
+
+          if [ -z "$BESOUND_KEYSTORE_BASE64" ] ||
+             [ -z "$BESOUND_KEY_ALIAS" ] ||
+             [ -z "$BESOUND_STORE_PASSWORD" ] ||
+             [ -z "$BESOUND_KEY_PASSWORD" ]; then
+            echo "ERROR: One or more signing secrets are missing."
+            exit 1
+          fi
+
           KEYSTORE_PATH="$RUNNER_TEMP/besound-release.jks"
-          printf '%s' "$BESOUND_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+
+          printf '%s' "$BESOUND_KEYSTORE_BASE64" \
+            | base64 --decode > "$KEYSTORE_PATH"
+
           test -s "$KEYSTORE_PATH"
-          keytool -list -keystore "$KEYSTORE_PATH" \
+
+          keytool -list \
+            -keystore "$KEYSTORE_PATH" \
             -storepass "$BESOUND_STORE_PASSWORD" \
-            -alias "$BESOUND_KEY_ALIAS" >/dev/null
+            -alias "$BESOUND_KEY_ALIAS" \
+            >/dev/null
+
           echo "BESOUND_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "Signing keystore and alias verified."
+
+          echo "Signing keystore verified."
 
       - name: Build signed release APK
         shell: bash
         env:
+          BESOUND_KEYSTORE_PATH: ${{ env.BESOUND_KEYSTORE_PATH }}
           BESOUND_KEY_ALIAS: ${{ secrets.BESOUND_KEY_ALIAS }}
           BESOUND_STORE_PASSWORD: ${{ secrets.BESOUND_STORE_PASSWORD }}
           BESOUND_KEY_PASSWORD: ${{ secrets.BESOUND_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+
           cd "$SOURCE_DIR"
-          gradle --no-daemon --stacktrace :app:assembleRelease
+
+          gradle --no-daemon clean assembleRelease
+
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+
+          if [ ! -f "$APK_PATH" ]; then
+            echo "ERROR: Release APK was not generated."
+            exit 1
+          fi
+
+          mkdir -p "$GITHUB_WORKSPACE/release"
+
+          cp "$APK_PATH" \
+            "$GITHUB_WORKSPACE/release/BESOUND-v1.0.2.apk"
 
       - name: Verify APK signature and package
         shell: bash
         run: |
           set -euo pipefail
-          APK="$SOURCE_DIR/app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -E "package: name='com.bei.besound'|versionCode='2'|versionName='1.0.1'"
-          ls -lh "$APK"
 
-      - name: Upload BESOUND v1.0.1 APK
+          APK="$GITHUB_WORKSPACE/release/BESOUND-v1.0.2.apk"
+
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+
+          "$APKSIGNER" verify --verbose "$APK"
+
+          "$AAPT" dump badging "$APK" | grep \
+            "package: name='com.bei.besound' versionCode='3' versionName='1.0.2'"
+
+          echo "APK signature and package verified."
+
+      - name: Upload BESOUND v1.0.2 APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.0.1-APK
-          path: ${{ env.SOURCE_DIR }}/app/build/outputs/apk/release/app-release.apk
+          name: BESOUND-v1.0.2-APK
+          path: release/BESOUND-v1.0.2.apk
           if-no-files-found: error
           retention-days: 30
