@@ -1,5 +1,4 @@
-
-name: Build BESOUND v1.1.6
+name: Build BESOUND v1.1.7 Golden Dusk Home
 
 on:
   workflow_dispatch:
@@ -30,15 +29,16 @@ jobs:
         shell: bash
         run: |
           SOURCE=$(find . -maxdepth 1 -type f \
-            -name 'BESOUND_v1.1.6_MEDIASESSION_ARTWORK_FIX_SOURCE*.zip' \
+            -name 'BESOUND_v1.1.7_GOLDEN_DUSK_HOME_SOURCE*.zip' \
             -printf '%T@ %p\n' \
             | sort -nr \
             | head -n 1 \
             | cut -d' ' -f2-)
 
           if [ -z "$SOURCE" ]; then
-            echo "ERROR: Source ZIP BESOUND v1.1.6 tidak ditemukan."
-            echo "File ZIP di root repository:"
+            echo "ERROR: Source ZIP BESOUND v1.1.7 tidak ditemukan di root repository."
+            echo "Pastikan file BESOUND_v1.1.7_GOLDEN_DUSK_HOME_SOURCE.zip sudah diunggah ke root repository."
+            echo "Daftar ZIP yang ditemukan:"
             find . -maxdepth 1 -type f -name '*.zip' -print
             exit 1
           fi
@@ -51,19 +51,15 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/besound-source"
-
-          unzip -q \
-            "${{ steps.source.outputs.zip_path }}" \
-            -d "$RUNNER_TEMP/besound-source"
+          unzip -q "${{ steps.source.outputs.zip_path }}" -d "$RUNNER_TEMP/besound-source"
 
           SOURCE_DIR=$(find "$RUNNER_TEMP/besound-source" \
-            -maxdepth 4 -type f -name settings.gradle.kts \
+            -maxdepth 5 -type f -name settings.gradle.kts \
             -print -quit | xargs -r dirname)
 
-          if [ -z "$SOURCE_DIR" ] || \
-             [ ! -f "$SOURCE_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: Struktur proyek Android tidak ditemukan."
-            find "$RUNNER_TEMP/besound-source" -maxdepth 4 -type f
+          if [ -z "$SOURCE_DIR" ] || [ ! -f "$SOURCE_DIR/app/build.gradle.kts" ]; then
+            echo "ERROR: Struktur proyek Android tidak ditemukan di dalam ZIP."
+            find "$RUNNER_TEMP/besound-source" -maxdepth 5 -type f -print
             exit 1
           fi
 
@@ -97,20 +93,18 @@ jobs:
         run: |
           FILE="$SOURCE_DIR/app/build.gradle.kts"
 
-          if ! grep -Fq 'com.bei.besound' "$FILE"; then
+          grep -Fq 'applicationId = "com.bei.besound"' "$FILE" || {
             echo "ERROR: Package ID tidak sesuai."
             exit 1
-          fi
-
-          if ! grep -Fq 'versionCode = 17' "$FILE"; then
-            echo "ERROR: Version code bukan 17."
+          }
+          grep -Fq 'versionCode = 18' "$FILE" || {
+            echo "ERROR: Version code bukan 18."
             exit 1
-          fi
-
-          if ! grep -Fq 'versionName = "1.1.6"' "$FILE"; then
-            echo "ERROR: Version name bukan 1.1.6."
+          }
+          grep -Fq 'versionName = "1.1.7"' "$FILE" || {
+            echo "ERROR: Version name bukan 1.1.7."
             exit 1
-          fi
+          }
 
           echo "Package ID, version code, dan version name terverifikasi."
 
@@ -123,8 +117,7 @@ jobs:
             exit 1
           fi
 
-          printf '%s' "$KEYSTORE_BASE64" \
-            | base64 --decode > "$BESOUND_KEYSTORE_PATH"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$BESOUND_KEYSTORE_PATH"
 
           if [ ! -s "$BESOUND_KEYSTORE_PATH" ]; then
             echo "ERROR: Keystore kosong."
@@ -140,8 +133,7 @@ jobs:
 
       - name: Build signed release APK
         working-directory: ${{ env.SOURCE_DIR }}
-        run: |
-          gradle --no-daemon clean assembleRelease
+        run: gradle --no-daemon clean assembleRelease
 
       - name: Verify APK
         shell: bash
@@ -150,30 +142,25 @@ jobs:
 
           if [ ! -s "$APK" ]; then
             echo "ERROR: APK tidak ditemukan."
-            find "$SOURCE_DIR/app/build/outputs" -type f || true
+            find "$SOURCE_DIR/app/build/outputs" -type f -print || true
             exit 1
           fi
 
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
-            verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
 
-          BADGING=$("$ANDROID_HOME/build-tools/35.0.0/aapt" \
-            dump badging "$APK")
-
-          echo "$BADGING" | grep -F \
-            "package: name='com.bei.besound' versionCode='17' versionName='1.1.6'"
+          BADGING=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK")
+          echo "$BADGING" | grep -F "package: name='com.bei.besound' versionCode='18' versionName='1.1.7'"
 
           echo "APK signed dan konfigurasi aplikasi berhasil diverifikasi."
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.1.6-MEDIASESSION-ARTWORK
+          name: BESOUND-v1.1.7-GOLDEN-DUSK-HOME
           path: ${{ env.SOURCE_DIR }}/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
       - name: Cleanup signing keystore
         if: always()
-        run: |
-          rm -f "$BESOUND_KEYSTORE_PATH"
+        run: rm -f "$BESOUND_KEYSTORE_PATH"
