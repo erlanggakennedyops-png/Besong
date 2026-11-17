@@ -1,5 +1,5 @@
 
-name: Build BESOUND v1.1.3
+name: Build BESOUND v1.1.4
 
 on:
   workflow_dispatch:
@@ -30,12 +30,16 @@ jobs:
         shell: bash
         run: |
           SOURCE=$(find . -maxdepth 1 -type f \
-            -name 'BESOUND_v1.1.3_DEFAULT_NOTIFICATION_ARTWORK_SOURCE*.zip' \
-            -print -quit)
+            -name 'BESOUND_v1.1.4_DATABASE_COVER_NOTIFICATION_FIX_SOURCE*.zip' \
+            -printf '%T@ %p\n' \
+            | sort -nr \
+            | head -n 1 \
+            | cut -d' ' -f2-)
 
           if [ -z "$SOURCE" ]; then
-            echo "ERROR: Source ZIP v1.1.3 tidak ditemukan."
-            ls -lah
+            echo "ERROR: Source ZIP BESOUND v1.1.4 tidak ditemukan."
+            echo "File ZIP di root repository:"
+            find . -maxdepth 1 -type f -name '*.zip' -print
             exit 1
           fi
 
@@ -99,17 +103,17 @@ jobs:
             exit 1
           fi
 
-          if ! grep -Fq 'versionCode = 14' "$FILE"; then
-            echo "ERROR: Version code bukan 14."
+          if ! grep -Fq 'versionCode = 15' "$FILE"; then
+            echo "ERROR: Version code bukan 15."
             exit 1
           fi
 
-          if ! grep -Fq '1.1.3' "$FILE"; then
-            echo "ERROR: Version 1.1.3 tidak ditemukan."
+          if ! grep -Fq 'versionName = "1.1.4"' "$FILE"; then
+            echo "ERROR: Version name bukan 1.1.4."
             exit 1
           fi
 
-          echo "Konfigurasi aplikasi terverifikasi."
+          echo "Package ID, version code, dan version name terverifikasi."
 
       - name: Prepare signing keystore
         env:
@@ -154,15 +158,18 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
             verify --verbose "$APK"
 
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" \
-            dump badging "$APK" | grep package
+          BADGING=$("$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            dump badging "$APK")
 
-          echo "APK berhasil diverifikasi."
+          echo "$BADGING" | grep -F \
+            "package: name='com.bei.besound' versionCode='15' versionName='1.1.4'"
+
+          echo "APK signed dan konfigurasi aplikasi berhasil diverifikasi."
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.1.3-DEFAULT-ARTWORK
+          name: BESOUND-v1.1.4-DATABASE-COVER-FIX
           path: ${{ env.SOURCE_DIR }}/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
