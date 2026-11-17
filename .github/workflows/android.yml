@@ -1,5 +1,5 @@
 
-name: Build BESOUND v1.1.5
+name: Build BESOUND v1.1.6
 
 on:
   workflow_dispatch:
@@ -30,14 +30,14 @@ jobs:
         shell: bash
         run: |
           SOURCE=$(find . -maxdepth 1 -type f \
-            -name 'BESOUND_v1.1.5_EMBEDDED_MP3_ARTWORK_SOURCE*.zip' \
+            -name 'BESOUND_v1.1.6_MEDIASESSION_ARTWORK_FIX_SOURCE*.zip' \
             -printf '%T@ %p\n' \
             | sort -nr \
             | head -n 1 \
             | cut -d' ' -f2-)
 
           if [ -z "$SOURCE" ]; then
-            echo "ERROR: Source ZIP BESOUND v1.1.5 tidak ditemukan."
+            echo "ERROR: Source ZIP BESOUND v1.1.6 tidak ditemukan."
             echo "File ZIP di root repository:"
             find . -maxdepth 1 -type f -name '*.zip' -print
             exit 1
@@ -45,7 +45,6 @@ jobs:
 
           echo "ZIP ditemukan: $SOURCE"
           unzip -tq "$SOURCE"
-
           echo "zip_path=$SOURCE" >> "$GITHUB_OUTPUT"
 
       - name: Extract source
@@ -103,13 +102,13 @@ jobs:
             exit 1
           fi
 
-          if ! grep -Fq 'versionCode = 16' "$FILE"; then
-            echo "ERROR: Version code bukan 16."
+          if ! grep -Fq 'versionCode = 17' "$FILE"; then
+            echo "ERROR: Version code bukan 17."
             exit 1
           fi
 
-          if ! grep -Fq 'versionName = "1.1.5"' "$FILE"; then
-            echo "ERROR: Version name bukan 1.1.5."
+          if ! grep -Fq 'versionName = "1.1.6"' "$FILE"; then
+            echo "ERROR: Version name bukan 1.1.6."
             exit 1
           fi
 
@@ -162,14 +161,14 @@ jobs:
             dump badging "$APK")
 
           echo "$BADGING" | grep -F \
-            "package: name='com.bei.besound' versionCode='16' versionName='1.1.5'"
+            "package: name='com.bei.besound' versionCode='17' versionName='1.1.6'"
 
           echo "APK signed dan konfigurasi aplikasi berhasil diverifikasi."
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.1.5-EMBEDDED-MP3-ARTWORK
+          name: BESOUND-v1.1.6-MEDIASESSION-ARTWORK
           path: ${{ env.SOURCE_DIR }}/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
