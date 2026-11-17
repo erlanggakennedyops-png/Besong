@@ -154,4 +154,3 @@ jobs:
         if: always()
         run: |
           rm -f "$BESOUND_KEYSTORE_PATH"
-w
