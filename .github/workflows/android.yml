@@ -1,5 +1,5 @@
 
-name: Build BESOUND v1.1.4
+name: Build BESOUND v1.1.5
 
 on:
   workflow_dispatch:
@@ -30,14 +30,14 @@ jobs:
         shell: bash
         run: |
           SOURCE=$(find . -maxdepth 1 -type f \
-            -name 'BESOUND_v1.1.4_DATABASE_COVER_NOTIFICATION_FIX_SOURCE*.zip' \
+            -name 'BESOUND_v1.1.5_EMBEDDED_MP3_ARTWORK_SOURCE*.zip' \
             -printf '%T@ %p\n' \
             | sort -nr \
             | head -n 1 \
             | cut -d' ' -f2-)
 
           if [ -z "$SOURCE" ]; then
-            echo "ERROR: Source ZIP BESOUND v1.1.4 tidak ditemukan."
+            echo "ERROR: Source ZIP BESOUND v1.1.5 tidak ditemukan."
             echo "File ZIP di root repository:"
             find . -maxdepth 1 -type f -name '*.zip' -print
             exit 1
@@ -103,13 +103,13 @@ jobs:
             exit 1
           fi
 
-          if ! grep -Fq 'versionCode = 15' "$FILE"; then
-            echo "ERROR: Version code bukan 15."
+          if ! grep -Fq 'versionCode = 16' "$FILE"; then
+            echo "ERROR: Version code bukan 16."
             exit 1
           fi
 
-          if ! grep -Fq 'versionName = "1.1.4"' "$FILE"; then
-            echo "ERROR: Version name bukan 1.1.4."
+          if ! grep -Fq 'versionName = "1.1.5"' "$FILE"; then
+            echo "ERROR: Version name bukan 1.1.5."
             exit 1
           fi
 
@@ -162,14 +162,14 @@ jobs:
             dump badging "$APK")
 
           echo "$BADGING" | grep -F \
-            "package: name='com.bei.besound' versionCode='15' versionName='1.1.4'"
+            "package: name='com.bei.besound' versionCode='16' versionName='1.1.5'"
 
           echo "APK signed dan konfigurasi aplikasi berhasil diverifikasi."
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.1.4-DATABASE-COVER-FIX
+          name: BESOUND-v1.1.5-EMBEDDED-MP3-ARTWORK
           path: ${{ env.SOURCE_DIR }}/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
