@@ -12,29 +12,28 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND v1.3.4
+    name: Build BESOUND v1.3.8
     runs-on: ubuntu-latest
 
     env:
       BESOUND_KEYSTORE_PATH: ${{ github.workspace }}/besound-release.jks
-      BESOUND_KEY_ALIAS: ${{ secrets.BESOUND_KEY_ALIAS }}
-      BESOUND_STORE_PASSWORD: ${{ secrets.BESOUND_STORE_PASSWORD }}
-      BESOUND_KEY_PASSWORD: ${{ secrets.BESOUND_KEY_PASSWORD }}
+      BESOUND_KEY_ALIAS: ${{ secrets.BESOUND_KEY_ALIAS || secrets.KEY_ALIAS }}
+      BESOUND_STORE_PASSWORD: ${{ secrets.BESOUND_STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+      BESOUND_KEY_PASSWORD: ${{ secrets.BESOUND_KEY_PASSWORD || secrets.KEY_PASSWORD }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Find and verify source ZIP
-        id: source
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP="BESOUND_v1.3.4_BEI_SONG_PLAYER_BACK_NAV_SOURCE.zip"
+          ZIP="BESOUND_v1.3.8_HOME_HERO_REFRESH_SOURCE.zip"
 
           if [ ! -f "$ZIP" ]; then
-            echo "::error::ZIP v1.3.4 tidak ditemukan di root repository."
+            echo "::error::ZIP v1.3.8 tidak ditemukan di root repository."
             echo "ZIP yang tersedia:"
             find . -maxdepth 2 -type f -name "*.zip"
             exit 1
@@ -42,8 +41,7 @@ jobs:
 
           unzip -tq "$ZIP"
 
-          echo "ZIP_PATH=$ZIP" >> "$GITHUB_OUTPUT"
-          echo "ZIP berhasil diverifikasi."
+          echo "ZIP v1.3.8 berhasil diverifikasi."
 
       - name: Extract source
         shell: bash
@@ -52,25 +50,25 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/besound-source"
 
-          unzip -q "${{ steps.source.outputs.ZIP_PATH }}" \
+          unzip -q \
+            "BESOUND_v1.3.8_HOME_HERO_REFRESH_SOURCE.zip" \
             -d "$RUNNER_TEMP/besound-source"
 
-          SOURCE_DIR="$RUNNER_TEMP/besound-source/BESOUND_v1.3.3_BEI_SONG_CLOUD_SOURCE"
+          SOURCE_DIR="$RUNNER_TEMP/besound-source/BESOUND_v1.3.8_HOME_HERO_REFRESH_SOURCE"
 
           if [ ! -f "$SOURCE_DIR/settings.gradle.kts" ]; then
-            echo "::error::Folder source Android tidak ditemukan."
-            find "$RUNNER_TEMP/besound-source" -maxdepth 4 -type f
+            echo "::error::settings.gradle.kts tidak ditemukan."
             exit 1
           fi
 
           if [ ! -f "$SOURCE_DIR/app/build.gradle.kts" ]; then
-            echo "::error::File app/build.gradle.kts tidak ditemukan."
+            echo "::error::app/build.gradle.kts tidak ditemukan."
             exit 1
           fi
 
           cp -a "$SOURCE_DIR/." "$GITHUB_WORKSPACE/"
 
-          echo "Source BESOUND berhasil dipasang."
+          echo "Source BESOUND berhasil diekstrak."
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -82,7 +80,10 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK packages
+        shell: bash
         run: |
+          set -euo pipefail
+
           sdkmanager \
             "platform-tools" \
             "platforms;android-35" \
@@ -100,35 +101,38 @@ jobs:
 
           FILE="app/build.gradle.kts"
 
-          if [ ! -f "$FILE" ]; then
-            echo "::error::app/build.gradle.kts tidak ditemukan."
-            exit 1
-          fi
-
           grep -Fq 'applicationId = "com.bei.besound"' "$FILE"
-          grep -Fq 'versionCode = 35' "$FILE"
-          grep -Fq 'versionName = "1.3.4"' "$FILE"
+          grep -Fq 'versionCode = 39' "$FILE"
+          grep -Fq 'versionName = "1.3.8"' "$FILE"
 
           echo "Package ID: com.bei.besound"
-          echo "Version code: 35"
-          echo "Version name: 1.3.4"
+          echo "Version code: 39"
+          echo "Version name: 1.3.8"
 
       - name: Prepare signing keystore
         shell: bash
         env:
-          KEYSTORE_BASE64: ${{ secrets.BESOUND_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.BESOUND_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 || secrets.SIGNING_KEY }}
         run: |
           set -euo pipefail
 
           if [ -z "${KEYSTORE_BASE64:-}" ]; then
-            echo "::error::Secret BESOUND_KEYSTORE_BASE64 tidak ditemukan."
+            echo "::error::Secret keystore Base64 tidak ditemukan."
             exit 1
           fi
 
-          if [ -z "${BESOUND_KEY_ALIAS:-}" ] || \
-             [ -z "${BESOUND_STORE_PASSWORD:-}" ] || \
-             [ -z "${BESOUND_KEY_PASSWORD:-}" ]; then
-            echo "::error::Signing secrets belum lengkap."
+          if [ -z "${BESOUND_KEY_ALIAS:-}" ]; then
+            echo "::error::Secret key alias tidak ditemukan."
+            exit 1
+          fi
+
+          if [ -z "${BESOUND_STORE_PASSWORD:-}" ]; then
+            echo "::error::Secret store password tidak ditemukan."
+            exit 1
+          fi
+
+          if [ -z "${BESOUND_KEY_PASSWORD:-}" ]; then
+            echo "::error::Secret key password tidak ditemukan."
             exit 1
           fi
 
@@ -145,8 +149,10 @@ jobs:
           echo "Signing keystore berhasil diverifikasi."
 
       - name: Build signed release APK
+        shell: bash
         run: |
           set -euo pipefail
+
           gradle --no-daemon --stacktrace clean assembleRelease
 
       - name: Verify APK
@@ -167,7 +173,7 @@ jobs:
           "$APKSIGNER" verify --verbose "$APK"
 
           "$AAPT" dump badging "$APK" \
-            | grep -F "package: name='com.bei.besound' versionCode='35' versionName='1.3.4'"
+            | grep -F "package: name='com.bei.besound' versionCode='39' versionName='1.3.8'"
 
           echo "APK berhasil diverifikasi."
           ls -lh "$APK"
@@ -175,12 +181,13 @@ jobs:
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.3.4-Release
+          name: BESOUND-v1.3.8-Release
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
       - name: Cleanup signing keystore
         if: always()
+        shell: bash
         run: |
           rm -f "$BESOUND_KEYSTORE_PATH"
