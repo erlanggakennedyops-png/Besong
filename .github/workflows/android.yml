@@ -1,4 +1,3 @@
-
 name: Build BESOUND Android APK
 
 on:
@@ -12,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND v1.4.0
+    name: Build BESOUND v1.4.1
     runs-on: ubuntu-latest
 
     env:
@@ -32,13 +31,13 @@ jobs:
           set -euo pipefail
 
           ZIP=$(find . -maxdepth 1 -type f \
-            \( -name 'BESOUND_v1.4.0_IMAGE_IMPORT_FIX_SOURCE.zip' \
-            -o -name 'BESOUND_v1.4.0_IMAGE_IMPORT_FIX_SOURCE-1.zip' \) \
+            -name 'BESOUND_v1.4.1_HOME_SEARCH_REFRESH_SOURCE.zip' \
             -print -quit)
 
           if [ -z "$ZIP" ]; then
-            echo "::error::ZIP BESOUND v1.4.0 tidak ditemukan."
-            find . -maxdepth 2 -type f -name "*.zip"
+            echo "::error::ZIP BESOUND v1.4.1 tidak ditemukan di root repository."
+            echo "File ZIP yang ditemukan:"
+            find . -maxdepth 2 -type f -name "*.zip" -print
             exit 1
           fi
 
@@ -56,15 +55,14 @@ jobs:
           unzip -q "${{ steps.source.outputs.ZIP_PATH }}" \
             -d "$RUNNER_TEMP/besound-source"
 
-          SOURCE_DIR="$RUNNER_TEMP/besound-source/BESOUND_v1.4.0_IMAGE_IMPORT_FIX_SOURCE"
+          SOURCE_DIR="$RUNNER_TEMP/besound-source/BESOUND_v1.4.1_HOME_SEARCH_REFRESH"
 
           test -f "$SOURCE_DIR/settings.gradle.kts"
           test -f "$SOURCE_DIR/build.gradle.kts"
           test -f "$SOURCE_DIR/app/build.gradle.kts"
 
           cp -a "$SOURCE_DIR/." "$GITHUB_WORKSPACE/"
-
-          echo "Source berhasil diekstrak."
+          echo "Source v1.4.1 berhasil diekstrak."
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -95,14 +93,14 @@ jobs:
           FILE="app/build.gradle.kts"
 
           grep -Fq 'applicationId = "com.bei.besound"' "$FILE"
-          grep -Fq 'versionCode = 41' "$FILE"
-          grep -Fq 'versionName = "1.4.0"' "$FILE"
+          grep -Fq 'versionCode = 42' "$FILE"
+          grep -Fq 'versionName = "1.4.1"' "$FILE"
 
           grep -Fq 'import androidx.compose.material.icons.filled.Image' \
             app/src/main/java/com/bei/besound/BeiSongCloud.kt
 
           echo "Package: com.bei.besound"
-          echo "Version: 1.4.0"
+          echo "Version: 1.4.1 (42)"
           echo "Image icon import: OK"
 
       - name: Prepare signing keystore
@@ -156,18 +154,17 @@ jobs:
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
 
           test -s "$APK"
-
           "$APKSIGNER" verify --verbose "$APK"
 
           "$AAPT" dump badging "$APK" \
-            | grep -F "package: name='com.bei.besound' versionCode='41' versionName='1.4.0'"
+            | grep -F "package: name='com.bei.besound' versionCode='42' versionName='1.4.1'"
 
           ls -lh "$APK"
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.4.0-Release
+          name: BESOUND-v1.4.1-Release
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
