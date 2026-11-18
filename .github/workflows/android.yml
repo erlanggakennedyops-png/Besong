@@ -31,11 +31,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP="BESOUND_v1.3.9_HOME_HERO_FIX_SOURCE.zip"
+          ZIP=$(find . -maxdepth 1 -type f \
+            \( -name 'BESOUND_v1.3.9_HOME_HERO_FIX_SOURCE.zip' \
+            -o -name 'BESOUND_v1.3.9_HOME_HERO_FIX_SOURCE-1.zip' \) \
+            -print -quit)
 
-          if [ ! -f "$ZIP" ]; then
-            echo "::error::ZIP v1.3.9 tidak ditemukan di root repository."
-            echo "ZIP yang tersedia:"
+          if [ -z "$ZIP" ]; then
+            echo "::error::ZIP BESOUND v1.3.9 tidak ditemukan."
+            echo "Daftar ZIP yang tersedia:"
             find . -maxdepth 2 -type f -name "*.zip"
             exit 1
           fi
@@ -43,7 +46,8 @@ jobs:
           unzip -tq "$ZIP"
 
           echo "ZIP_PATH=$ZIP" >> "$GITHUB_OUTPUT"
-          echo "Source ZIP berhasil diverifikasi."
+          echo "ZIP ditemukan: $ZIP"
+          echo "Integritas ZIP valid."
 
       - name: Extract source
         shell: bash
@@ -60,6 +64,7 @@ jobs:
 
           if [ ! -f "$SOURCE_DIR/settings.gradle.kts" ]; then
             echo "::error::settings.gradle.kts tidak ditemukan."
+            find "$RUNNER_TEMP/besound-source" -maxdepth 4 -type f
             exit 1
           fi
 
