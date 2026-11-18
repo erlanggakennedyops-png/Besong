@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           SOURCE=$(find . -maxdepth 1 -type f \
-            -name 'BESOUND_v1.2.6_SIGNATURE_BRANDING_SOURCE*.zip' \
+            -name 'BESOUND_v1.2.6_SIGNATURE_BORDER_FIX_SOURCE*.zip' \
             -printf '%T@ %p\n' \
             | sort -nr \
             | head -n 1 \
@@ -37,7 +37,7 @@ jobs:
 
           if [ -z "$SOURCE" ]; then
             echo "ERROR: Source ZIP BESOUND v1.2.6 Signature Branding tidak ditemukan di root repository."
-            echo "Pastikan file BESOUND_v1.2.6_SIGNATURE_BRANDING_SOURCE.zip sudah diunggah ke root repository."
+            echo "Pastikan file BESOUND_v1.2.6_SIGNATURE_BORDER_FIX_SOURCE.zip sudah diunggah ke root repository."
             echo "Daftar ZIP yang ditemukan:"
             find . -maxdepth 1 -type f -name '*.zip' -print
             exit 1
@@ -156,7 +156,7 @@ jobs:
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.2.6-SIGNATURE-BRANDING
+          name: BESOUND-v1.2.6-SIGNATURE-BORDER-FIX
           path: ${{ env.SOURCE_DIR }}/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
