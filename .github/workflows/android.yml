@@ -146,10 +146,10 @@ jobs:
             exit 1
           fi
 
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --min-sdk-version 26 "$APK"
 
           BADGING=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK")
-          echo "$BADGING" | grep -F "package: name='com.bei.besound' versionCode='26' versionName='1.2.6'"
+          echo "$BADGING" | grep -F "package: name='com.bei.besound' versionCode='27' versionName='1.2.6'"
 
           echo "APK signed dan konfigurasi aplikasi berhasil diverifikasi."
 
