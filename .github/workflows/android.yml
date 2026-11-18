@@ -1,4 +1,4 @@
-name: Build BESOUND v1.2.3 Dynamic Cover Glow
+name: Build BESOUND v1.2.5 Dynamic Cover Glow
 
 on:
   workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           SOURCE=$(find . -maxdepth 1 -type f \
-            -name 'BESOUND_v1.2.3_DYNAMIC_COVER_GLOW_SOURCE*.zip' \
+            -name 'BESOUND_v1.2.5_DYNAMIC_COVER_GLOW_SOURCE*.zip' \
             -printf '%T@ %p\n' \
             | sort -nr \
             | head -n 1 \
@@ -37,7 +37,7 @@ jobs:
 
           if [ -z "$SOURCE" ]; then
             echo "ERROR: Source ZIP BESOUND v1.2.2 tidak ditemukan di root repository."
-            echo "Pastikan file BESOUND_v1.2.3_DYNAMIC_COVER_GLOW_SOURCE.zip sudah diunggah ke root repository."
+            echo "Pastikan file BESOUND_v1.2.5_DYNAMIC_COVER_GLOW_SOURCE.zip sudah diunggah ke root repository."
             echo "Daftar ZIP yang ditemukan:"
             find . -maxdepth 1 -type f -name '*.zip' -print
             exit 1
@@ -97,11 +97,11 @@ jobs:
             echo "ERROR: Package ID tidak sesuai."
             exit 1
           }
-          grep -Fq 'versionCode = 24' "$FILE" || {
+          grep -Fq 'versionCode = 26' "$FILE" || {
             echo "ERROR: Version code bukan 22."
             exit 1
           }
-          grep -Fq 'versionName = "1.2.3"' "$FILE" || {
+          grep -Fq 'versionName = "1.2.5"' "$FILE" || {
             echo "ERROR: Version name bukan 1.2.1."
             exit 1
           }
@@ -149,14 +149,14 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
 
           BADGING=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK")
-          echo "$BADGING" | grep -F "package: name='com.bei.besound' versionCode='24' versionName='1.2.3'"
+          echo "$BADGING" | grep -F "package: name='com.bei.besound' versionCode='26' versionName='1.2.5'"
 
           echo "APK signed dan konfigurasi aplikasi berhasil diverifikasi."
 
       - name: Upload BESOUND APK
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.2.3-DYNAMIC-COVER-GLOW
+          name: BESOUND-v1.2.5-DYNAMIC-COVER-GLOW
           path: ${{ env.SOURCE_DIR }}/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
