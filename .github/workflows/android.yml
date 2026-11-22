@@ -1,3 +1,4 @@
+
 name: Build BESOUND Android APK
 
 on:
@@ -15,11 +16,13 @@ jobs:
   build:
     name: Build BESOUND v1.5.0
     runs-on: ubuntu-latest
+
     env:
       BESOUND_KEYSTORE_PATH: ${{ github.workspace }}/besound-release.jks
       BESOUND_KEY_ALIAS: ${{ secrets.BESOUND_KEY_ALIAS || secrets.KEY_ALIAS }}
       BESOUND_STORE_PASSWORD: ${{ secrets.BESOUND_STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
       BESOUND_KEY_PASSWORD: ${{ secrets.BESOUND_KEY_PASSWORD || secrets.KEY_PASSWORD }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,9 +33,12 @@ jobs:
         run: |
           set -euo pipefail
           ZIP="BESOUND_v1.5.0_THREE_DOT_MENU_SOURCE.zip"
-          test -s "$ZIP" || { echo "::error::Upload $ZIP to the repository root (same level as the .github folder)."; exit 1; }
+          test -s "$ZIP" || { echo "::error::Upload $ZIP to repository root."; exit 1; }
           unzip -tq "$ZIP"
-          unzip -Z1 "$ZIP" | grep -Fxq 'BESOUND_v1.5.0_THREE_DOT_MENU/app/build.gradle.kts' || { echo "::error::Expected project folder or app/build.gradle.kts is missing inside ZIP."; exit 1; }
+          unzip -Z1 "$ZIP" | grep -Fxq 'BESOUND_v1.5.0_THREE_DOT_MENU/app/build.gradle.kts' || {
+            echo "::error::Project folder or app/build.gradle.kts is missing."
+            exit 1
+          }
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
       - name: Extract Android project
