@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - 'BESOUND_v1.5.0_THREE_DOT_MENU_SOURCE.zip'
+      - '.github/workflows/android.yml'
 
 permissions:
   contents: read
@@ -27,17 +30,21 @@ jobs:
         run: |
           set -euo pipefail
           ZIP="BESOUND_v1.5.0_THREE_DOT_MENU_SOURCE.zip"
-          test -s "$ZIP" || { echo "::error::Upload $ZIP to the repository root."; exit 1; }
+          test -s "$ZIP" || { echo "::error::Upload $ZIP to the repository root (same level as the .github folder)."; exit 1; }
           unzip -tq "$ZIP"
+          unzip -Z1 "$ZIP" | grep -Fxq 'BESOUND_v1.5.0_THREE_DOT_MENU/app/build.gradle.kts' || { echo "::error::Expected project folder or app/build.gradle.kts is missing inside ZIP."; exit 1; }
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
       - name: Extract Android project
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/besound"
-          unzip -q "${{ steps.source.outputs.zip }}" -d "$RUNNER_TEMP/besound"
-          SRC="$RUNNER_TEMP/besound/BESOUND_v1.5.0_THREE_DOT_MENU"
+          EXTRACT_DIR="$RUNNER_TEMP/besound-source"
+          mkdir -p "$EXTRACT_DIR"
+          unzip -q "${{ steps.source.outputs.zip }}" -d "$EXTRACT_DIR"
+          SRC="$EXTRACT_DIR/BESOUND_v1.5.0_THREE_DOT_MENU"
+          test -f "$SRC/settings.gradle.kts"
+          test -f "$SRC/build.gradle.kts"
           test -f "$SRC/app/build.gradle.kts"
           cp -a "$SRC/." "$GITHUB_WORKSPACE/"
 
@@ -51,6 +58,7 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK packages
+        shell: bash
         run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle 8.9
@@ -91,39 +99,20 @@ jobs:
           mkdir -p release
           cp "$APK" release/BESOUND-v1.5.0.apk
 
-      - name: Verify APK
+      - name: Verify APK package and signature
         shell: bash
         run: |
           set -euo pipefail
-
           APK="release/BESOUND-v1.5.0.apk"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
-
-          if [ ! -s "$APK" ]; then
-            echo "::error::APK tidak ditemukan: $APK"
-            find app/build/outputs release -maxdepth 5 -type f -print 2>/dev/null || true
-            exit 1
-          fi
-
+          test -s "$APK"
           BADGING=$("$AAPT" dump badging "$APK")
-
-          echo "=== APK PACKAGE INFO ==="
           echo "$BADGING" | head -n 1
-
-          echo "=== CHECK PACKAGE ID ==="
           echo "$BADGING" | grep -F "name='com.bei.besound'"
-
-          echo "=== CHECK VERSION CODE ==="
           echo "$BADGING" | grep -F "versionCode='51'"
-
-          echo "=== CHECK VERSION NAME ==="
           echo "$BADGING" | grep -F "versionName='1.5.0'"
-
-          echo "=== VERIFY APK SIGNATURE ==="
           "$APKSIGNER" verify --verbose "$APK"
-
-          echo "=== APK FILE ==="
           ls -lh "$APK"
           echo "BESOUND v1.5.0 APK verification successful."
 
@@ -137,4 +126,5 @@ jobs:
 
       - name: Remove signing keystore
         if: always()
+        shell: bash
         run: rm -f "$BESOUND_KEYSTORE_PATH"
