@@ -1,4 +1,3 @@
-
 name: Build BESOUND Android APK
 
 on:
@@ -11,15 +10,13 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND v1.4.6
+    name: Build BESOUND v1.4.7
     runs-on: ubuntu-latest
-
     env:
       BESOUND_KEYSTORE_PATH: ${{ github.workspace }}/besound-release.jks
       BESOUND_KEY_ALIAS: ${{ secrets.BESOUND_KEY_ALIAS || secrets.KEY_ALIAS }}
       BESOUND_STORE_PASSWORD: ${{ secrets.BESOUND_STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
       BESOUND_KEY_PASSWORD: ${{ secrets.BESOUND_KEY_PASSWORD || secrets.KEY_PASSWORD }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,14 +26,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP="BESOUND_v1.4.6_CLOUD_PLAYLIST_BUILD_FIX_SOURCE.zip"
-
-          if [ ! -s "$ZIP" ]; then
-            echo "::error::Source ZIP tidak ditemukan: $ZIP"
-            exit 1
-          fi
-
+          ZIP="BESOUND_v1.4.7_PLAYLIST_FIX_SOURCE.zip"
+          test -s "$ZIP" || { echo "::error::Upload $ZIP to the repository root."; exit 1; }
           unzip -tq "$ZIP"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
@@ -44,20 +35,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           mkdir -p "$RUNNER_TEMP/besound"
-
-          unzip -q "${{ steps.source.outputs.zip }}" \
-            -d "$RUNNER_TEMP/besound"
-
-          SRC="$RUNNER_TEMP/besound/BESOUND_v1.4.6_CLOUD_PLAYLIST"
-
-          if [ ! -f "$SRC/app/build.gradle.kts" ]; then
-            echo "::error::Struktur project Android tidak ditemukan."
-            find "$RUNNER_TEMP/besound" -maxdepth 3 -type f | head -100
-            exit 1
-          fi
-
+          unzip -q "${{ steps.source.outputs.zip }}" -d "$RUNNER_TEMP/besound"
+          SRC="$RUNNER_TEMP/besound/BESOUND_v1.4.7_PLAYLIST_FIX"
+          test -f "$SRC/app/build.gradle.kts"
           cp -a "$SRC/." "$GITHUB_WORKSPACE/"
 
       - name: Set up JDK 17
@@ -70,13 +51,7 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK packages
-        shell: bash
-        run: |
-          set -euo pipefail
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -87,16 +62,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          FILE="app/build.gradle.kts"
-
+          FILE=app/build.gradle.kts
           grep -Fq 'applicationId = "com.bei.besound"' "$FILE"
-          grep -Fq 'versionCode = 47' "$FILE"
-          grep -Fq 'versionName = "1.4.6"' "$FILE"
-
-          echo "Package ID: com.bei.besound"
-          echo "Version Code: 47"
-          echo "Version Name: 1.4.6"
+          grep -Fq 'versionCode = 48' "$FILE"
+          grep -Fq 'versionName = "1.4.7"' "$FILE"
 
       - name: Prepare signing keystore
         shell: bash
@@ -104,112 +73,48 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.BESOUND_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 || secrets.SIGNING_KEY }}
         run: |
           set -euo pipefail
-
-          if [ -z "${KEYSTORE_BASE64:-}" ]; then
-            echo "::error::Keystore Base64 tidak ditemukan."
-            exit 1
-          fi
-
-          if [ -z "${BESOUND_KEY_ALIAS:-}" ]; then
-            echo "::error::Key alias tidak ditemukan."
-            exit 1
-          fi
-
-          if [ -z "${BESOUND_STORE_PASSWORD:-}" ]; then
-            echo "::error::Store password tidak ditemukan."
-            exit 1
-          fi
-
-          if [ -z "${BESOUND_KEY_PASSWORD:-}" ]; then
-            echo "::error::Key password tidak ditemukan."
-            exit 1
-          fi
-
-          printf '%s' "$KEYSTORE_BASE64" \
-            | base64 --decode > "$BESOUND_KEYSTORE_PATH"
-
+          test -n "${KEYSTORE_BASE64:-}" || { echo "::error::Keystore Base64 secret missing."; exit 1; }
+          test -n "${BESOUND_KEY_ALIAS:-}" || { echo "::error::Key alias secret missing."; exit 1; }
+          test -n "${BESOUND_STORE_PASSWORD:-}" || { echo "::error::Store password secret missing."; exit 1; }
+          test -n "${BESOUND_KEY_PASSWORD:-}" || { echo "::error::Key password secret missing."; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$BESOUND_KEYSTORE_PATH"
           test -s "$BESOUND_KEYSTORE_PATH"
-
-          keytool -list \
-            -keystore "$BESOUND_KEYSTORE_PATH" \
-            -storepass "$BESOUND_STORE_PASSWORD" \
-            -alias "$BESOUND_KEY_ALIAS"
-
-          echo "Signing keystore berhasil diverifikasi."
+          keytool -list -keystore "$BESOUND_KEYSTORE_PATH" -storepass "$BESOUND_STORE_PASSWORD" -alias "$BESOUND_KEY_ALIAS"
 
       - name: Build signed release APK
         shell: bash
         run: |
           set -euo pipefail
-
           gradle --no-daemon --stacktrace clean assembleRelease
-
-          APK="app/build/outputs/apk/release/app-release.apk"
-
-          if [ ! -s "$APK" ]; then
-            echo "::error::APK release tidak ditemukan."
-            find app/build/outputs -type f -print || true
-            exit 1
-          fi
-
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
           mkdir -p release
-          cp "$APK" release/BESOUND-v1.4.6.apk
-
-          echo "Release APK berhasil dibuat."
+          cp "$APK" release/BESOUND-v1.4.7.apk
 
       - name: Verify APK
         shell: bash
         run: |
           set -euo pipefail
-
-          APK="release/BESOUND-v1.4.6.apk"
-
+          APK=release/BESOUND-v1.4.7.apk
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
-
-          if [ ! -s "$APK" ]; then
-            echo "::error::APK tidak ditemukan."
-            exit 1
-          fi
-
-          echo "=== APK PACKAGE INFO ==="
-
+          test -s "$APK"
           BADGING=$("$AAPT" dump badging "$APK")
-
           echo "$BADGING" | head -n 1
-
-          echo "=== VERIFY PACKAGE ID ==="
-          echo "$BADGING" | grep -F \
-            "name='com.bei.besound'"
-
-          echo "=== VERIFY VERSION CODE ==="
-          echo "$BADGING" | grep -F \
-            "versionCode='47'"
-
-          echo "=== VERIFY VERSION NAME ==="
-          echo "$BADGING" | grep -F \
-            "versionName='1.4.6'"
-
-          echo "=== VERIFY APK SIGNATURE ==="
-
+          echo "$BADGING" | grep -F "name='com.bei.besound'"
+          echo "$BADGING" | grep -F "versionCode='48'"
+          echo "$BADGING" | grep -F "versionName='1.4.7'"
           "$APKSIGNER" verify --verbose "$APK"
-
-          echo "=== APK FILE SIZE ==="
           ls -lh "$APK"
-
-          echo "BESOUND v1.4.6 APK verification successful."
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.4.6-Release
-          path: release/BESOUND-v1.4.6.apk
+          name: BESOUND-v1.4.7-Release
+          path: release/BESOUND-v1.4.7.apk
           if-no-files-found: error
           retention-days: 14
 
       - name: Remove signing keystore
         if: always()
-        shell: bash
-        run: |
-          rm -f "$BESOUND_KEYSTORE_PATH"
-          echo "Temporary signing keystore removed."
+        run: rm -f "$BESOUND_KEYSTORE_PATH"
