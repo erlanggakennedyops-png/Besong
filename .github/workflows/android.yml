@@ -95,17 +95,37 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APK=release/BESOUND-v1.4.8.apk
+
+          APK="release/BESOUND-v1.4.8.apk"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
-          test -s "$APK"
+
+          if [ ! -s "$APK" ]; then
+            echo "::error::APK tidak ditemukan: $APK"
+            find app/build/outputs release -maxdepth 5 -type f -print 2>/dev/null || true
+            exit 1
+          fi
+
           BADGING=$("$AAPT" dump badging "$APK")
+
+          echo "=== APK PACKAGE INFO ==="
           echo "$BADGING" | head -n 1
+
+          echo "=== CHECK PACKAGE ID ==="
           echo "$BADGING" | grep -F "name='com.bei.besound'"
-          echo "$BADGING" | grep -F "versionCode='48'"
-          echo "$BADGING" | grep -F "versionName='1.4.7'"
+
+          echo "=== CHECK VERSION CODE ==="
+          echo "$BADGING" | grep -F "versionCode='49'"
+
+          echo "=== CHECK VERSION NAME ==="
+          echo "$BADGING" | grep -F "versionName='1.4.8'"
+
+          echo "=== VERIFY APK SIGNATURE ==="
           "$APKSIGNER" verify --verbose "$APK"
+
+          echo "=== APK FILE ==="
           ls -lh "$APK"
+          echo "BESOUND v1.4.8 APK verification successful."
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
