@@ -118,4 +118,3 @@ jobs:
       - name: Remove signing keystore
         if: always()
         run: rm -f "$BESOUND_KEYSTORE_PATH"
-a
