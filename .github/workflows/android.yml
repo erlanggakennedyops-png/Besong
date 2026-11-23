@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'BESOUND_v1.5.0_THREE_DOT_MENU_SOURCE*.zip'
+      - 'BESOUND_v1.5.0_THREE_DOT_MENU_SOURCE.zip'
       - '.github/workflows/android.yml'
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND v1.5.0
+    name: Build BESOUND v1.5.1
     runs-on: ubuntu-latest
     env:
       BESOUND_KEYSTORE_PATH: ${{ github.workspace }}/besound-release.jks
@@ -29,21 +29,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          CANDIDATES=(BESOUND_v1.5.0_THREE_DOT_MENU_SOURCE*.zip)
-          if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
-            echo "::error::No BESOUND source ZIP found in repository root. Expected BESOUND_v1.5.0_THREE_DOT_MENU_SOURCE*.zip."
-            echo "Files in repository root:"
-            ls -la
-            exit 1
-          fi
-          if [[ ${#CANDIDATES[@]} -gt 1 ]]; then
-            echo "::error::More than one BESOUND source ZIP found. Keep only one in repository root:"
-            printf ' - %s\n' "${CANDIDATES[@]}"
-            exit 1
-          fi
-          ZIP="${CANDIDATES[0]}"
-          echo "Using source archive: $ZIP"
+          ZIP="BESOUND_v1.5.0_THREE_DOT_MENU_SOURCE.zip"
+          test -s "$ZIP" || { echo "::error::Upload $ZIP to the repository root (same level as the .github folder)."; exit 1; }
           unzip -tq "$ZIP"
           unzip -Z1 "$ZIP" | grep -Fxq 'BESOUND_v1.5.0_THREE_DOT_MENU/app/build.gradle.kts' || { echo "::error::Expected project folder or app/build.gradle.kts is missing inside ZIP."; exit 1; }
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
@@ -85,8 +72,8 @@ jobs:
           set -euo pipefail
           FILE=app/build.gradle.kts
           grep -Fq 'applicationId = "com.bei.besound"' "$FILE"
-          grep -Fq 'versionCode = 51' "$FILE"
-          grep -Fq 'versionName = "1.5.0"' "$FILE"
+          grep -Fq 'versionCode = 52' "$FILE"
+          grep -Fq 'versionName = "1.5.1"' "$FILE"
 
       - name: Prepare signing keystore
         shell: bash
@@ -110,30 +97,30 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           mkdir -p release
-          cp "$APK" release/BESOUND-v1.5.0.apk
+          cp "$APK" release/BESOUND-v1.5.1.apk
 
       - name: Verify APK package and signature
         shell: bash
         run: |
           set -euo pipefail
-          APK="release/BESOUND-v1.5.0.apk"
+          APK="release/BESOUND-v1.5.1.apk"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           test -s "$APK"
           BADGING=$("$AAPT" dump badging "$APK")
           echo "$BADGING" | head -n 1
           echo "$BADGING" | grep -F "name='com.bei.besound'"
-          echo "$BADGING" | grep -F "versionCode='51'"
-          echo "$BADGING" | grep -F "versionName='1.5.0'"
+          echo "$BADGING" | grep -F "versionCode='52'"
+          echo "$BADGING" | grep -F "versionName='1.5.1'"
           "$APKSIGNER" verify --verbose "$APK"
           ls -lh "$APK"
-          echo "BESOUND v1.5.0 APK verification successful."
+          echo "BESOUND v1.5.1 APK verification successful."
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.5.0-Release
-          path: release/BESOUND-v1.5.0.apk
+          name: BESOUND-v1.5.1-Release
+          path: release/BESOUND-v1.5.1.apk
           if-no-files-found: error
           retention-days: 14
 
