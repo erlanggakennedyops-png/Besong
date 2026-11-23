@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'BESOUND_v1.6.2_GLOBAL_MUSIC_SOURCE*.zip'
+      - 'BESOUND_v1.6.3_GLOBAL_MUSIC_NO_KEY_SOURCE*.zip'
       - '.github/workflows/android.yml'
 
 permissions:
@@ -13,14 +13,13 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND v1.6.2
+    name: Build BESOUND v1.6.3
     runs-on: ubuntu-latest
     env:
       BESOUND_KEYSTORE_PATH: ${{ github.workspace }}/besound-release.jks
       BESOUND_KEY_ALIAS: ${{ secrets.BESOUND_KEY_ALIAS || secrets.KEY_ALIAS }}
       BESOUND_STORE_PASSWORD: ${{ secrets.BESOUND_STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
       BESOUND_KEY_PASSWORD: ${{ secrets.BESOUND_KEY_PASSWORD || secrets.KEY_PASSWORD }}
-      AUDIUS_API_KEY: ${{ secrets.AUDIUS_API_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,14 +30,14 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          CANDIDATES=(BESOUND_v1.6.2_GLOBAL_MUSIC_SOURCE*.zip)
+          CANDIDATES=(BESOUND_v1.6.3_GLOBAL_MUSIC_NO_KEY_SOURCE*.zip)
           if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
-            echo "::error::Upload BESOUND_v1.6.2_GLOBAL_MUSIC_SOURCE.zip to the repository root."
+            echo "::error::Upload BESOUND_v1.6.3_GLOBAL_MUSIC_NO_KEY_SOURCE.zip to the repository root."
             ls -la
             exit 1
           fi
           if [[ ${#CANDIDATES[@]} -gt 1 ]]; then
-            echo "::error::More than one BESOUND v1.6.2 source ZIP found. Keep only one in the repository root."
+            echo "::error::More than one BESOUND v1.6.3 source ZIP found. Keep only one in the repository root."
             printf ' - %s\n' "${CANDIDATES[@]}"
             exit 1
           fi
@@ -85,17 +84,8 @@ jobs:
           set -euo pipefail
           FILE=app/build.gradle.kts
           grep -Fq 'applicationId = "com.bei.besound"' "$FILE"
-          grep -Fq 'versionCode = 55' "$FILE"
-          grep -Fq 'versionName = "1.6.2"' "$FILE"
-
-      - name: Verify Audius API key
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "${AUDIUS_API_KEY:-}" || {
-            echo "::error::Add the free Audius developer key as GitHub Actions Secret AUDIUS_API_KEY. See https://api.audius.co/plans"
-            exit 1
-          }
+          grep -Fq 'versionCode = 56' "$FILE"
+          grep -Fq 'versionName = "1.6.3"' "$FILE"
 
       - name: Prepare signing keystore
         shell: bash
@@ -119,28 +109,28 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           mkdir -p release
-          cp "$APK" release/BESOUND-v1.6.2.apk
+          cp "$APK" release/BESOUND-v1.6.3.apk
 
       - name: Verify APK package and signature
         shell: bash
         run: |
           set -euo pipefail
-          APK="release/BESOUND-v1.6.2.apk"
+          APK="release/BESOUND-v1.6.3.apk"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           BADGING=$("$AAPT" dump badging "$APK")
           echo "$BADGING" | head -n 1
           echo "$BADGING" | grep -F "name='com.bei.besound'"
-          echo "$BADGING" | grep -F "versionCode='54'"
-          echo "$BADGING" | grep -F "versionName='1.6.1'"
+          echo "$BADGING" | grep -F "versionCode='56'"
+          echo "$BADGING" | grep -F "versionName='1.6.3'"
           "$APKSIGNER" verify --verbose "$APK"
           ls -lh "$APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.6.2-Release
-          path: release/BESOUND-v1.6.2.apk
+          name: BESOUND-v1.6.3-Release
+          path: release/BESOUND-v1.6.3.apk
           if-no-files-found: error
           retention-days: 14
 
