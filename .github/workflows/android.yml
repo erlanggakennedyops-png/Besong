@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'BESOUND_v1.6.7_LOCAL_AUDIO_PLAYBACK_FIX_SOURCE*.zip'
+      - 'BESOUND_v1.6.9_ADMIN_LYRICS_PLAYER_FIX_SOURCE*.zip'
       - '.github/workflows/android.yml'
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND v1.6.7
+    name: Build BESOUND v1.6.9
     runs-on: ubuntu-latest
     env:
       BESOUND_KEYSTORE_PATH: ${{ github.workspace }}/besound-release.jks
@@ -23,30 +23,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Locate and verify source ZIP
         id: source
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          CANDIDATES=(BESOUND_v1.6.7_LOCAL_AUDIO_PLAYBACK_FIX_SOURCE*.zip)
-          if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
-            echo "::error::Upload BESOUND_v1.6.7_LOCAL_AUDIO_PLAYBACK_FIX_SOURCE.zip to the repository root."
+          CANDIDATES=(BESOUND_v1.6.9_ADMIN_LYRICS_PLAYER_FIX_SOURCE*.zip)
+          if [[ ${#CANDIDATES[@]} -ne 1 ]]; then
+            echo "::error::Keep exactly one v1.6.9 source ZIP in repository root."
             ls -la
-            exit 1
-          fi
-          if [[ ${#CANDIDATES[@]} -gt 1 ]]; then
-            echo "::error::More than one BESOUND v1.6.7 source ZIP found. Keep only one in the repository root."
-            printf ' - %s\n' "${CANDIDATES[@]}"
             exit 1
           fi
           ZIP="${CANDIDATES[0]}"
           unzip -tq "$ZIP"
           unzip -Z1 "$ZIP" | grep -Fxq 'BESOUND_v1.5.0_THREE_DOT_MENU/app/build.gradle.kts'
-          unzip -Z1 "$ZIP" | grep -Fxq 'BESOUND_v1.5.0_THREE_DOT_MENU/app/src/main/java/com/bei/besound/GlobalMusic.kt' 
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
-
       - name: Extract Android project
         shell: bash
         run: |
@@ -54,39 +46,27 @@ jobs:
           EXTRACT_DIR="$RUNNER_TEMP/besound-source"
           mkdir -p "$EXTRACT_DIR"
           unzip -q "${{ steps.source.outputs.zip }}" -d "$EXTRACT_DIR"
-          SRC="$EXTRACT_DIR/BESOUND_v1.5.0_THREE_DOT_MENU"
-          test -f "$SRC/settings.gradle.kts"
-          test -f "$SRC/build.gradle.kts"
-          test -f "$SRC/app/build.gradle.kts"
-          cp -a "$SRC/." "$GITHUB_WORKSPACE/"
-
+          cp -a "$EXTRACT_DIR/BESOUND_v1.5.0_THREE_DOT_MENU/." "$GITHUB_WORKSPACE/"
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
-
       - name: Install Android SDK packages
-        shell: bash
         run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
       - name: Verify app identity
         shell: bash
         run: |
           set -euo pipefail
-          FILE=app/build.gradle.kts
-          grep -Fq 'applicationId = "com.bei.besound"' "$FILE"
-          grep -Fq 'versionCode = 60' "$FILE"
-          grep -Fq 'versionName = "1.6.7"' "$FILE"
-
+          grep -Fq 'applicationId = "com.bei.besound"' app/build.gradle.kts
+          grep -Fq 'versionCode = 62' app/build.gradle.kts
+          grep -Fq 'versionName = "1.6.9"' app/build.gradle.kts
       - name: Prepare signing keystore
         shell: bash
         env:
@@ -100,7 +80,6 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$BESOUND_KEYSTORE_PATH"
           test -s "$BESOUND_KEYSTORE_PATH"
           keytool -list -keystore "$BESOUND_KEYSTORE_PATH" -storepass "$BESOUND_STORE_PASSWORD" -alias "$BESOUND_KEY_ALIAS"
-
       - name: Build signed release APK
         shell: bash
         run: |
@@ -109,32 +88,22 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           mkdir -p release
-          cp "$APK" release/BESOUND-v1.6.7.apk
-
+          cp "$APK" release/BESOUND-v1.6.9.apk
       - name: Verify APK package and signature
         shell: bash
         run: |
           set -euo pipefail
-          APK="release/BESOUND-v1.6.7.apk"
-          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          APK=release/BESOUND-v1.6.9.apk
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
-          BADGING=$("$AAPT" dump badging "$APK")
-          echo "$BADGING" | head -n 1
-          echo "$BADGING" | grep -F "name='com.bei.besound'"
-          echo "$BADGING" | grep -F "versionCode='60'"
-          echo "$BADGING" | grep -F "versionName='1.6.7'"
-          "$APKSIGNER" verify --verbose "$APK"
-          ls -lh "$APK"
-
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test "$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")" = com.bei.besound
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.6.6-Release
-          path: release/BESOUND-v1.6.7.apk
+          name: BESOUND-v1.6.9
+          path: release/BESOUND-v1.6.9.apk
           if-no-files-found: error
-          retention-days: 14
-
       - name: Remove signing keystore
         if: always()
-        shell: bash
         run: rm -f "$BESOUND_KEYSTORE_PATH"
