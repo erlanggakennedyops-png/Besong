@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'BESOUND_v1.6.10_ICON_IMPORT_FIX_SOURCE*.zip'
+      - 'BESOUND_v1.6.11_HOME_ARTWORK_UPLOAD_REFRESH_SOURCE*.zip'
       - '.github/workflows/android.yml'
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND v1.6.10
+    name: Build BESOUND v1.6.11
     runs-on: ubuntu-latest
     env:
       BESOUND_KEYSTORE_PATH: ${{ github.workspace }}/besound-release.jks
@@ -29,9 +29,9 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          CANDIDATES=(BESOUND_v1.6.10_ICON_IMPORT_FIX_SOURCE*.zip)
+          CANDIDATES=(BESOUND_v1.6.11_HOME_ARTWORK_UPLOAD_REFRESH_SOURCE*.zip)
           if [[ ${#CANDIDATES[@]} -ne 1 ]]; then
-            echo "::error::Keep exactly one v1.6.10 source ZIP in repository root."
+            echo "::error::Keep exactly one v1.6.11 source ZIP in repository root."
             ls -la
             exit 1
           fi
@@ -65,8 +65,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'applicationId = "com.bei.besound"' app/build.gradle.kts
-          grep -Fq 'versionCode = 63' app/build.gradle.kts
-          grep -Fq 'versionName = "1.6.10"' app/build.gradle.kts
+          grep -Fq 'versionCode = 64' app/build.gradle.kts
+          grep -Fq 'versionName = "1.6.11"' app/build.gradle.kts
       - name: Prepare signing keystore
         shell: bash
         env:
@@ -88,12 +88,12 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           mkdir -p release
-          cp "$APK" release/BESOUND-v1.6.10.apk
+          cp "$APK" release/BESOUND-v1.6.11.apk
       - name: Verify APK package and signature
         shell: bash
         run: |
           set -euo pipefail
-          APK=release/BESOUND-v1.6.10.apk
+          APK=release/BESOUND-v1.6.11.apk
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           test "$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")" = com.bei.besound
@@ -102,7 +102,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: BESOUND-v1.6.10
-          path: release/BESOUND-v1.6.10.apk
+          path: release/BESOUND-v1.6.11.apk
           if-no-files-found: error
       - name: Remove signing keystore
         if: always()
