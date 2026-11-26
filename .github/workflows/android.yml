@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'BESOUND_v1.6.4_GLOBAL_MUSIC_DISCOVERY_SOURCE*.zip'
+      - 'BESOUND_v1.6.5_PLAYBACK_FIX_SOURCE*.zip'
       - '.github/workflows/android.yml'
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build BESOUND v1.6.4
+    name: Build BESOUND v1.6.5
     runs-on: ubuntu-latest
     env:
       BESOUND_KEYSTORE_PATH: ${{ github.workspace }}/besound-release.jks
@@ -30,14 +30,14 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          CANDIDATES=(BESOUND_v1.6.4_GLOBAL_MUSIC_DISCOVERY_SOURCE*.zip)
+          CANDIDATES=(BESOUND_v1.6.5_PLAYBACK_FIX_SOURCE*.zip)
           if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
-            echo "::error::Upload BESOUND_v1.6.4_GLOBAL_MUSIC_DISCOVERY_SOURCE.zip to the repository root."
+            echo "::error::Upload BESOUND_v1.6.5_PLAYBACK_FIX_SOURCE.zip to the repository root."
             ls -la
             exit 1
           fi
           if [[ ${#CANDIDATES[@]} -gt 1 ]]; then
-            echo "::error::More than one BESOUND v1.6.4 source ZIP found. Keep only one in the repository root."
+            echo "::error::More than one BESOUND v1.6.5 source ZIP found. Keep only one in the repository root."
             printf ' - %s\n' "${CANDIDATES[@]}"
             exit 1
           fi
@@ -84,8 +84,8 @@ jobs:
           set -euo pipefail
           FILE=app/build.gradle.kts
           grep -Fq 'applicationId = "com.bei.besound"' "$FILE"
-          grep -Fq 'versionCode = 57' "$FILE"
-          grep -Fq 'versionName = "1.6.4"' "$FILE"
+          grep -Fq 'versionCode = 58' "$FILE"
+          grep -Fq 'versionName = "1.6.5"' "$FILE"
 
       - name: Prepare signing keystore
         shell: bash
@@ -109,28 +109,28 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           mkdir -p release
-          cp "$APK" release/BESOUND-v1.6.4.apk
+          cp "$APK" release/BESOUND-v1.6.5.apk
 
       - name: Verify APK package and signature
         shell: bash
         run: |
           set -euo pipefail
-          APK="release/BESOUND-v1.6.4.apk"
+          APK="release/BESOUND-v1.6.5.apk"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           BADGING=$("$AAPT" dump badging "$APK")
           echo "$BADGING" | head -n 1
           echo "$BADGING" | grep -F "name='com.bei.besound'"
-          echo "$BADGING" | grep -F "versionCode='57'"
-          echo "$BADGING" | grep -F "versionName='1.6.4'"
+          echo "$BADGING" | grep -F "versionCode='58'"
+          echo "$BADGING" | grep -F "versionName='1.6.5'"
           "$APKSIGNER" verify --verbose "$APK"
           ls -lh "$APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BESOUND-v1.6.4-Release
-          path: release/BESOUND-v1.6.4.apk
+          name: BESOUND-v1.6.5-Release
+          path: release/BESOUND-v1.6.5.apk
           if-no-files-found: error
           retention-days: 14
 
